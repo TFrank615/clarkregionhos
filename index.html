@@ -89,7 +89,8 @@
         function formatTime(timestamp) {
             if (!timestamp) return '--:--';
             const date = new Date(timestamp.seconds * 1000);
-            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + date.toLocaleDateString();
+            // Updated to force 24-hour format (hour12: false)
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) + ' ' + date.toLocaleDateString();
         }
 
         function getStatusStyles(status) {
@@ -150,7 +151,6 @@
                                 </div>
                             </div>
                         </div>
-                        <!-- Clock Removed -->
                     </header>
 
                     <!-- Stats Bar -->
