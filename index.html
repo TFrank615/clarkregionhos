@@ -24,7 +24,7 @@
             error: null
         };
 
-        // --- Shared Configuration (Same as your main app) ---
+        // --- Shared Configuration ---
         const firebaseConfig = {
             apiKey: "AIzaSyAuO1PsUAsMf0OsaK78P9pnnnfHDUXB3bE",
             authDomain: "hospital-tracker-e0e23.firebaseapp.com",
@@ -62,7 +62,7 @@
             const hospitalsRef = collection(db, 'artifacts', appId, 'public', 'data', 'hospitals');
             onSnapshot(hospitalsRef, (snapshot) => {
                 state.hospitals = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                // Sort by status (Diversion first) then name
+                // Sort: Diversion first, then Name
                 state.hospitals.sort((a, b) => {
                     if (a.status === 'Diversion' && b.status !== 'Diversion') return -1;
                     if (a.status !== 'Diversion' && b.status === 'Diversion') return 1;
@@ -76,7 +76,7 @@
                 render();
             });
 
-            // 2. Recent Activity Log (Optional ticker)
+            // 2. Recent Activity Log
             const logsRef = collection(db, 'artifacts', appId, 'public', 'data', 'hospital_logs');
             const qLogs = query(logsRef, orderBy('timestamp', 'desc'), limit(5));
             onSnapshot(qLogs, (snapshot) => {
@@ -89,24 +89,29 @@
         function formatTime(timestamp) {
             if (!timestamp) return '--:--';
             const date = new Date(timestamp.seconds * 1000);
-            // Updated to force 24-hour format (hour12: false)
             return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }) + ' ' + date.toLocaleDateString();
         }
 
-        function getStatusStyles(status) {
+        function getStatusConfig(status) {
             if (status === 'Normal') return {
-                card: 'bg-white border-emerald-500 border-l-8',
-                badge: 'bg-emerald-100 text-emerald-800',
+                cardBg: 'bg-white',
+                border: 'border-l-8 border-emerald-500',
+                badgeBg: 'bg-emerald-100',
+                badgeText: 'text-emerald-800',
                 icon: 'check-circle'
             };
             if (status === 'Diversion') return {
-                card: 'bg-rose-50 border-rose-600 border-l-8 shadow-md', // Highlight diversion more
-                badge: 'bg-rose-600 text-white',
+                cardBg: 'bg-rose-50',
+                border: 'border-l-8 border-rose-600',
+                badgeBg: 'bg-rose-600',
+                badgeText: 'text-white',
                 icon: 'alert-triangle'
             };
             return {
-                card: 'bg-slate-50 border-slate-300 border-l-8',
-                badge: 'bg-slate-200 text-slate-700',
+                cardBg: 'bg-slate-50',
+                border: 'border-l-8 border-slate-300',
+                badgeBg: 'bg-slate-200',
+                badgeText: 'text-slate-700',
                 icon: 'help-circle'
             };
         }
@@ -117,8 +122,8 @@
             
             if (state.error) {
                 root.innerHTML = `
-                    <div class="min-h-screen flex items-center justify-center bg-slate-900 text-red-500 font-bold text-2xl">
-                        <i data-lucide="wifi-off" class="w-8 h-8 mr-3"></i> ${state.error}
+                    <div class="h-screen w-screen flex items-center justify-center bg-slate-900 text-red-500 font-bold text-3xl">
+                        <i data-lucide="wifi-off" class="w-12 h-12 mr-4"></i> ${state.error}
                     </div>`;
                 lucide.createIcons();
                 return;
@@ -126,8 +131,8 @@
 
             if (state.loading) {
                 root.innerHTML = `
-                    <div class="min-h-screen flex items-center justify-center bg-slate-900 text-slate-400">
-                        <i data-lucide="refresh-cw" class="w-12 h-12 animate-spin"></i>
+                    <div class="h-screen w-screen flex items-center justify-center bg-slate-900 text-slate-400">
+                        <i data-lucide="refresh-cw" class="w-16 h-16 animate-spin"></i>
                     </div>`;
                 lucide.createIcons();
                 return;
@@ -135,83 +140,116 @@
 
             const diversionCount = state.hospitals.filter(h => h.status === 'Diversion').length;
 
+            // --- Layout Calculations ---
+            // Calculate grid rows based on count to force fit. 
+            // 4 columns is fixed. 
+            // 1-4 items = 1 row
+            // 5-8 items = 2 rows
+            // 9-12 items = 3 rows
+            // 13-16 items = 4 rows
+            const totalItems = state.hospitals.length;
+            const columns = 4;
+            let rows = Math.ceil(totalItems / columns);
+            if (rows < 2) rows = 2; // Minimum visual rows for aesthetics
+
+            // 1670x1080 Layout
             root.innerHTML = `
-                <div class="min-h-screen bg-slate-100 font-sans text-slate-900 flex flex-col overflow-hidden">
-                    <!-- Header Bar -->
-                    <header class="bg-slate-900 text-white p-6 shadow-lg z-10 flex justify-between items-center">
+                <div class="h-screen w-screen bg-slate-100 font-sans text-slate-900 flex flex-col overflow-hidden select-none">
+                    
+                    <!-- Top Bar (Fixed Height: ~80px) -->
+                    <header class="bg-slate-900 text-white p-5 shadow-lg z-20 shrink-0 flex justify-between items-center relative">
                         <div class="flex items-center gap-4">
-                            <div class="bg-indigo-600 p-3 rounded-lg">
+                            <div class="bg-indigo-600 p-2 rounded-lg shadow-lg shadow-indigo-900/50">
                                 <i data-lucide="activity" class="w-8 h-8 text-white"></i>
                             </div>
                             <div>
-                                <h1 class="text-3xl font-bold tracking-tight">Regional Hospital Status</h1>
+                                <h1 class="text-3xl font-bold tracking-tight">Regional Hospital Status Board</h1>
                                 <div class="flex items-center gap-2 text-slate-400 text-sm mt-1">
                                     <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                                    System Live
+                                    System Operational
                                 </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Mini Stats in Header for Space Efficiency -->
+                        <div class="flex items-center gap-6 bg-slate-800/50 px-6 py-2 rounded-lg border border-slate-700">
+                            <div class="text-center">
+                                <span class="text-slate-400 text-xs uppercase font-bold block">Tracked</span>
+                                <span class="text-2xl font-bold text-white leading-none">${state.hospitals.length}</span>
+                            </div>
+                            <div class="w-px h-8 bg-slate-700"></div>
+                            <div class="text-center">
+                                <span class="text-slate-400 text-xs uppercase font-bold block">Diversion</span>
+                                <span class="text-2xl font-bold ${diversionCount > 0 ? 'text-rose-500' : 'text-emerald-500'} leading-none">${diversionCount}</span>
                             </div>
                         </div>
                     </header>
 
-                    <!-- Stats Bar -->
-                    <div class="bg-white border-b border-slate-200 px-8 py-3 flex items-center gap-8 shadow-sm">
-                        <div class="flex items-center gap-2">
-                            <span class="text-slate-500 text-sm uppercase font-bold">Total Tracked:</span>
-                            <span class="text-xl font-bold text-slate-800">${state.hospitals.length}</span>
-                        </div>
-                        <div class="h-6 w-px bg-slate-200"></div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-slate-500 text-sm uppercase font-bold">On Diversion:</span>
-                            <span class="text-xl font-bold ${diversionCount > 0 ? 'text-rose-600' : 'text-emerald-600'}">${diversionCount}</span>
-                        </div>
-                    </div>
-
-                    <!-- Main Grid -->
-                    <main class="flex-1 p-6 overflow-y-auto h-full">
+                    <!-- Main Content Area (Fills remaining height) -->
+                    <!-- p-4 gives a small buffer. -->
+                    <main class="flex-1 p-4 overflow-hidden h-full">
                         ${state.hospitals.length === 0 ? `
                             <div class="h-full flex flex-col items-center justify-center text-slate-400">
-                                <i data-lucide="inbox" class="w-16 h-16 mb-4 opacity-50"></i>
-                                <p class="text-xl">Waiting for hospital data...</p>
+                                <i data-lucide="inbox" class="w-20 h-20 mb-4 opacity-50"></i>
+                                <p class="text-2xl">Waiting for data...</p>
                             </div>
                         ` : `
-                            <!-- Reverted to fixed large columns, added larger text classes -->
-                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 h-full content-start">
+                            <!-- 
+                                STRICT GRID SYSTEM 
+                                grid-template-rows: repeat(${rows}, minmax(0, 1fr))
+                                This forces the rows to split the available height equally. 
+                                No scrollbars will appear as long as content inside cards handles overflow.
+                            -->
+                            <div class="grid grid-cols-4 gap-4 h-full" style="grid-template-rows: repeat(${rows}, minmax(0, 1fr));">
                                 ${state.hospitals.map(h => {
-                                    const styles = getStatusStyles(h.status);
+                                    const styles = getStatusConfig(h.status);
+                                    const isDiversion = h.status === 'Diversion';
+                                    
                                     return `
-                                    <div class="${styles.card} rounded-xl shadow-sm p-6 flex flex-col transition-all h-full">
-                                        <div class="flex justify-between items-start mb-4">
-                                            <div class="flex-1 pr-2">
-                                                <!-- Increased Text Size: text-3xl -->
-                                                <h2 class="text-3xl font-bold text-slate-900 leading-tight">${h.name}</h2>
-                                                <!-- Increased Text Size: text-sm -->
-                                                <p class="text-sm text-slate-400 mt-2 font-medium">Updated: ${formatTime(h.lastUpdated)}</p>
-                                            </div>
-                                            <!-- Increased Badge Size -->
-                                            <div class="${styles.badge} px-4 py-2 rounded-full text-base font-bold flex items-center gap-2 shadow-sm shrink-0">
-                                                <i data-lucide="${styles.icon}" class="w-5 h-5"></i>
-                                                ${h.status.toUpperCase()}
-                                            </div>
-                                        </div>
+                                    <div class="${styles.cardBg} ${styles.border} rounded-lg shadow-sm flex flex-col relative overflow-hidden transition-all duration-300">
                                         
-                                        <div class="mt-auto space-y-4">
-                                            ${h.reason ? `
-                                                <div class="bg-slate-100/80 p-4 rounded border border-slate-200">
-                                                    <!-- Increased Label Size -->
-                                                    <span class="text-sm font-bold text-slate-500 uppercase tracking-wide block mb-1">REASONS</span>
-                                                    <!-- Increased Body Size: text-xl -->
-                                                    <p class="text-xl font-medium text-slate-800 uppercase leading-snug">${h.reason}</p>
-                                                </div>
-                                            ` : ''}
-                                            ${h.comments ? `
-                                                <div class="bg-slate-100/80 p-4 rounded border border-slate-200">
-                                                    <!-- Increased Label Size -->
-                                                    <span class="text-sm font-bold text-slate-500 uppercase tracking-wide block mb-1">COMMENTS</span>
-                                                    <!-- Increased Body Size: text-lg -->
-                                                    <p class="text-lg text-slate-700 uppercase leading-snug">${h.comments}</p>
-                                                </div>
-                                            ` : ''}
+                                        <!-- Card Header: Compact & Unified -->
+                                        <div class="p-4 border-b border-slate-100/50 flex justify-between items-start gap-2 bg-gradient-to-r from-transparent to-black/5">
+                                            <h2 class="text-xl font-bold text-slate-900 leading-tight line-clamp-2" title="${h.name}">
+                                                ${h.name}
+                                            </h2>
+                                            
+                                            <div class="${styles.badgeBg} ${styles.badgeText} px-2 py-1 rounded text-xs font-bold uppercase tracking-wider flex items-center gap-1 shadow-sm whitespace-nowrap shrink-0">
+                                                <i data-lucide="${styles.icon}" class="w-3 h-3"></i>
+                                                ${h.status}
+                                            </div>
                                         </div>
+
+                                        <!-- Card Body: Takes all remaining space -->
+                                        <div class="flex-1 p-4 flex flex-col justify-center min-h-0">
+                                            ${isDiversion ? `
+                                                <!-- DIVERSION LAYOUT -->
+                                                <div class="flex-1 flex flex-col justify-center min-h-0">
+                                                    <div class="bg-rose-100/50 rounded p-3 border border-rose-200 h-full flex flex-col">
+                                                        <span class="text-xs font-bold text-rose-800 uppercase tracking-widest mb-1 opacity-75">Reason for Diversion</span>
+                                                        <div class="flex-1 overflow-hidden relative group">
+                                                            <!-- Text scales or clamps -->
+                                                            <p class="text-lg font-bold text-rose-900 leading-snug line-clamp-[6]">
+                                                                ${h.reason || "No specific reason provided."}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ` : `
+                                                <!-- NORMAL LAYOUT -->
+                                                <div class="flex-1 flex flex-col items-center justify-center opacity-30">
+                                                    <i data-lucide="activity" class="w-12 h-12 text-slate-400 mb-2"></i>
+                                                    <span class="text-sm font-medium text-slate-500">Operating Normally</span>
+                                                </div>
+                                            `}
+                                        </div>
+
+                                        <!-- Card Footer: Last Updated -->
+                                        <div class="bg-slate-50 p-2 border-t border-slate-100 flex justify-between items-center text-xs text-slate-400">
+                                            <span class="font-mono">UPDATED: ${formatTime(h.lastUpdated)}</span>
+                                            ${h.comments && !isDiversion ? '<i data-lucide="message-square" class="w-3 h-3 text-indigo-400"></i>' : ''}
+                                        </div>
+
                                     </div>
                                     `;
                                 }).join('')}
@@ -219,26 +257,39 @@
                         `}
                     </main>
 
-                    <!-- Bottom Ticker (Recent Changes) -->
-                    <footer class="bg-slate-800 text-slate-300 px-6 py-3 text-base flex items-center gap-4 whitespace-nowrap overflow-hidden">
-                        <span class="font-bold text-indigo-400">LATEST UPDATES:</span>
-                        <div class="flex gap-8 animate-marquee">
-                            ${state.logs.length > 0 ? state.logs.map(l => `
-                                <span class="flex items-center gap-2">
-                                    <i data-lucide="clock" class="w-4 h-4"></i> ${formatTime(l.timestamp)}: 
-                                    <strong class="text-white">${l.hospitalName}</strong> → 
-                                    <span class="${l.newStatus === 'Diversion' ? 'text-rose-400' : 'text-emerald-400'}">${l.newStatus}</span>
-                                </span>
-                            `).join('<span class="text-slate-600 mx-2">|</span>') : 'No recent updates.'}
+                    <!-- Bottom Ticker (Fixed Height: ~40px) -->
+                    <footer class="bg-slate-800 text-slate-300 px-4 py-2 text-sm flex items-center gap-4 whitespace-nowrap overflow-hidden shrink-0 border-t-4 border-indigo-600 h-[50px]">
+                        <div class="flex items-center gap-2 text-indigo-400 font-bold px-2 border-r border-slate-600 pr-4">
+                            <i data-lucide="rss" class="w-4 h-4"></i>
+                            UPDATES
+                        </div>
+                        <div class="flex gap-8 overflow-hidden w-full relative">
+                            <!-- Removed animate-marquee class to stop scrolling -->
+                            <div class="flex gap-8">
+                                ${state.logs.length > 0 ? state.logs.map(l => `
+                                    <span class="flex items-center gap-2">
+                                        <span class="font-mono opacity-50 text-xs">[${formatTime(l.timestamp)}]</span> 
+                                        <strong class="text-white">${l.hospitalName}</strong>
+                                        <span class="text-slate-500">→</span>
+                                        <span class="${l.newStatus === 'Diversion' ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'}">${l.newStatus}</span>
+                                    </span>
+                                `).join('<span class="text-slate-700">///</span>') : 'No recent status changes recorded.'}
+                            </div>
                         </div>
                     </footer>
                 </div>
+                
+                <style>
+                    /* Smooth font rendering for large screens */
+                    body {
+                        -webkit-font-smoothing: antialiased;
+                    }
+                </style>
             `;
             
             lucide.createIcons();
         }
 
-        // Initial Render
         render();
     </script>
 </head>
